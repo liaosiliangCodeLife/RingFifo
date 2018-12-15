@@ -1,3 +1,18 @@
+/**
+ * @file ringfifo.c
+ *
+ *  ringfifo api source file
+ *
+ *
+ * @author siliangLiao
+ *
+ * @date 7/6/2018
+ *
+ * @mail<liaosiliang1234@126.com>
+ *
+ * Copyright SiliangLiao. All right reserved.
+ *
+ */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -5,30 +20,26 @@
 #include <unistd.h>
 #include "ringfifo.h"
 
+/*macro define*/
 #define ringFifoMalloc(_M)                   malloc((_M))
 #define ringFifoFree(_R)                     free((_R))
 #define ringFifoCpy(_C1, _C2, _C3)           memcpy((_C1), (_C2), (_C3))
 #define ringFiFoSet(_S1, _S2, _S3)           memset((_S1), (_S2), (_S3))
 
-#define ringFifoErr            printf
-#define ringFifoDug            printf
-
-#define RINGDATASIZE(_F)               ((((_F)->mWrx) - ((_F)->mRdx)))
-#define RINGFREESIZE(_F)               (((_F)->mSize) - RINGDATASIZE(_F))
-#define RINGFIFONEEDLOOPBACK(_F, _B)   (((((_F)->mWrx)%((_F)->mSize)) + (_B)) > ((_F)->mSize))
-#define RINGFIFOWRPOS(_F)              ((((_F)->mWrx) % ((_F)->mSize)))
-#define RINGFIFORDPOS(_F)              ((((_F)->mRdx) % ((_F)->mSize)))
-#define RINGREARFREESIZE(_F)           (((_F)->mSize) - (((_F)->mWrx)) % ((_F)->mSize))
-#define RINGFIFOTOTALSIZE(_F)          (((_F)->mStep) * ((_F)->mPow) * ((_F)->mCount))
-
 #define RINGFIFOSHRINKTIME                   1024
 
-typedef struct{
-char test[234];
-int  indx;
-}testData;
 
-
+/*
+*Data copy to ringfifo
+*
+*@param in:
+*    vFifo: ringfifo that you inited.
+*    vBuf:  buffer that need restore to ringfifo.
+*    vBlocksSize: the store data length
+*
+*@return :
+*    the stored size of the data
+*/
 static int copytoringfifo(ringFifo* vFifo,const unsigned char* vBuf, const unsigned int vBlocksSize)
 {
   int i = 0;
@@ -49,7 +60,17 @@ static int copytoringfifo(ringFifo* vFifo,const unsigned char* vBuf, const unsig
 }
 
 
-
+/*
+*ringfifo copy to Data buffer
+*
+*@param in:
+*    vFifo: ringfifo that you inited.
+*    vBuf:  buffer that to store ringfifo data.
+*    vBlocksSize: the store data length
+*
+*@return :
+*    the stored size of the data
+*/
 static int copytobuffer(ringFifo* vFifo, unsigned char* vBuf, const unsigned int vBlocksSize)
 {
   int i = 0;
@@ -70,7 +91,15 @@ static int copytobuffer(ringFifo* vFifo, unsigned char* vBuf, const unsigned int
 }
 
 
-
+/*
+*ringfifo enlarge
+*
+*@param in:
+*    vFifo: ringfifo that you inited.
+*
+*@return :
+*    enlarge successed pointer of the ringfifo else NULL.
+*/
 static ringFifo* enlargeringfifo(ringFifo* vFifo)
 {
   unsigned char* iTmBuf = NULL;
@@ -95,6 +124,17 @@ static ringFifo* enlargeringfifo(ringFifo* vFifo)
 }
 
 
+
+/*
+*Greate a ringfifo instance
+*
+*@param in:
+*    vStepSize: The data struct size
+*    vCount: number of the data struct
+*
+*@return :
+*    init successed pointer of the ringfifo else NULL.
+*/
 ringFifo* initRingFifo(unsigned int vStepSize, unsigned int vCount)
 {
   ringFifo* retFifo = ringFifoMalloc(sizeof(ringFifo));
@@ -126,6 +166,17 @@ ringFifo* initRingFifo(unsigned int vStepSize, unsigned int vCount)
 }
 
 
+/*
+*Push date to ringfifo.
+*
+*@param in:
+*    vFifo: ringfifo that you inited.
+*    vBuf:  buffer that restore to ringfifo data.
+*    vBlocksSize: the store data length
+*
+*@return :
+*    the stored size of the data.
+*/
 int pushToRingFifo(ringFifo* vFifo, void* vBuf, unsigned int vBlockSize)
 {
    if(!(vBlockSize%vFifo->mStep))
@@ -154,6 +205,17 @@ int pushToRingFifo(ringFifo* vFifo, void* vBuf, unsigned int vBlockSize)
 }
 
 
+/*
+*Pop out from ringfifo.
+*
+*@param in:
+*    vFifo: ringfifo that you inited.
+*    vBuf:  buffer that to store ringfifo data.
+*    vBlocksSize: the store data length
+*
+*@return :
+*    the stored size of the data
+*/
 int popFromRingFifo(ringFifo* vFifo,void* vBuf, unsigned int vBlockSize)
 {
   if(!(vBlockSize%vFifo->mStep))
@@ -174,6 +236,16 @@ int popFromRingFifo(ringFifo* vFifo,void* vBuf, unsigned int vBlockSize)
   }
 }
 
+
+/*
+*Simple check if ringfifo need shrink.
+*
+*@param in:
+*    vFifo: ringfifo that you inited.
+*
+*@return :
+*    the init ringfifo.
+*/
 ringFifo* checkRingFifoShrink(ringFifo* vFifo)
 {
   if(!RINGDATASIZE(vFifo) && (1 != vFifo->mPow))
@@ -197,67 +269,17 @@ ringFifo* checkRingFifoShrink(ringFifo* vFifo)
   }
 }
 
+
+
+/*
+*Simple destory ringfifo.
+*
+*@param in:
+*    vFifo: ringfifo that you inited.
+*
+*/
 void destroyRingFifo(ringFifo* vFifo)
 {
   ringFifoFree(vFifo->mBbuf);
   ringFifoFree(vFifo);
 }
-
-static unsigned int wr = 0;
-static unsigned int rd = 0;
-
-static void srandWrite(ringFifo* iFifo, char* vStr)
-{
-  srand(time(NULL));
-  int count = rand()%77;
-  int i=0;
-  testData* iTmp = malloc(sizeof(testData));
-  
-  for(i=0; i<count; i++)
-  {
-    memset(iTmp, 0, sizeof(testData));
-    sprintf(iTmp->test,"%s:%d:%d,wr=%ld rd=%ld", vStr, time(NULL), i, iFifo->mWrx, iFifo->mRdx);
-    iTmp->indx = i;
-    pushToRingFifo(iFifo, iTmp, sizeof(testData));
-    wr++;
-    usleep(100*100);
-  }
-  free(iTmp);
-}
-
-
-static void srandRead(ringFifo* iFifo)
-{
-  srand(time(NULL));
-  int count = rand()%333;
-  int i=0;
-  testData* iTmp = malloc(sizeof(testData));
-  for(i=0; i<count; i++)
-  {
-    memset(iTmp, 0, sizeof(testData));
-    if(0 != popFromRingFifo(iFifo,iTmp, sizeof(testData)))
-    {
-      printf("Indx = %d  content = %s\n", iTmp->indx,iTmp->test);
-      rd ++;
-      usleep(100*100);
-    }else{
-      printf("read data = %ld  write Data = %ld\n",iFifo->mRdx, iFifo->mWrx);
-      free(iTmp);
-      return ;
-    }
-  }
-  free(iTmp);
-}
-
-
-int main(int argv, char* argc[])
-{
-  ringFifo* iFifo =  initRingFifo(sizeof(testData), 345);
-  while(1)
-  {
-    srandWrite(iFifo, argc[1]);
-    srandRead(iFifo);
-  }
-}
-
-
